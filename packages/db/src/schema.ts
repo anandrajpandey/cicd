@@ -1,4 +1,4 @@
-import { customType, jsonb, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, customType, jsonb, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 type AppendOnlyAuditPayload = unknown;
 type AuditUpdateAttempt = {
@@ -48,6 +48,21 @@ export const pipelineEventsTable = pgTable("pipeline_events", {
   metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull(),
   timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const repositoriesTable = pgTable("repositories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  provider: text("provider").notNull(),
+  owner: text("owner").notNull(),
+  name: text("name").notNull(),
+  fullName: text("full_name").notNull().unique(),
+  defaultBranch: text("default_branch").notNull(),
+  isPrivate: boolean("is_private").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });
 
 export const agentFindingsTable = pgTable("agent_findings", {

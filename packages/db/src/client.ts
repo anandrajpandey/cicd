@@ -8,6 +8,7 @@ import {
   challengesTable,
   decisionsTable,
   pipelineEventsTable,
+  repositoriesTable,
   rebuttalsTable
 } from "./schema.js";
 
@@ -18,7 +19,8 @@ const schema = {
   rebuttalsTable,
   decisionsTable,
   approvalsTable,
-  auditLogTable
+  auditLogTable,
+  repositoriesTable
 };
 
 export const createDatabaseClient = (connectionString = process.env.DATABASE_URL) => {

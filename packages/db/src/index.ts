@@ -9,26 +9,31 @@ export {
   createAuditUpdateAttempt,
   decisionsTable,
   pipelineEventsTable,
+  repositoriesTable,
   rebuttalsTable
 } from "./schema.js";
 export {
   getAnalyticsSnapshot,
   getApprovalById,
   getIncidentById,
+  getRepositoryByFullName,
   listApprovals,
   listIncidents,
+  listRepositories,
   persistAgentFindings,
   persistApproval,
   persistAuditEntries,
   persistChallenges,
   persistDecision,
   persistPipelineEvent,
-  persistRebuttals
+  persistRebuttals,
+  upsertRepositories
 } from "./models.js";
 export type {
   AnalyticsSnapshot,
   ApprovalDetail,
   ApprovalListItem,
+  ConnectedRepository,
   IncidentDetail,
   IncidentListItem
 } from "./models.js";

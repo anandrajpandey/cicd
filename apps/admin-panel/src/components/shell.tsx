@@ -31,6 +31,7 @@ export const AdminShell = ({
   <main style={pageShellStyle}>
     <div style={navStyle}>
       <Link href="/">Dashboard</Link>
+      <Link href="/repositories">Repositories</Link>
       <Link href="/incidents">Incidents</Link>
       <Link href="/approvals">Approvals</Link>
       <Link href="/analytics">Analytics</Link>

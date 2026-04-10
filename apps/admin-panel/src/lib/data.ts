@@ -3,8 +3,11 @@ import {
   getAnalyticsSnapshot,
   getApprovalById,
   getIncidentById,
+  getRepositoryByFullName,
   listApprovals,
   listIncidents,
+  listRepositories,
+  type ConnectedRepository,
   type AnalyticsSnapshot,
   type ApprovalDetail,
   type ApprovalListItem,
@@ -13,14 +16,17 @@ import {
 } from "@packages/db";
 
 import { analyticsSnapshot, approvals, incidents } from "./mock-data";
+import { readWorkspaceEnvVar } from "./env";
 
 const withDatabase = async <T>(query: (client: ReturnType<typeof createDatabaseClient>) => Promise<T>): Promise<T | null> => {
-  if (!process.env.DATABASE_URL) {
+  const databaseUrl = process.env.DATABASE_URL ?? readWorkspaceEnvVar("DATABASE_URL");
+
+  if (!databaseUrl) {
     return null;
   }
 
   try {
-    const client = createDatabaseClient(process.env.DATABASE_URL);
+    const client = createDatabaseClient(databaseUrl);
 
     try {
       return await query(client);
@@ -87,6 +93,12 @@ export const getApprovalDetailData = async (id: string): Promise<ApprovalDetail 
 
 export const getAnalyticsData = async (): Promise<AnalyticsSnapshot> =>
   (await withDatabase((client) => getAnalyticsSnapshot(client))) ?? analyticsSnapshot;
+
+export const getConnectedRepositories = async (): Promise<ConnectedRepository[]> =>
+  (await withDatabase((client) => listRepositories(client))) ?? [];
+
+export const getConnectedRepository = async (fullName: string): Promise<ConnectedRepository | null> =>
+  (await withDatabase((client) => getRepositoryByFullName(client, fullName))) ?? null;
 
 export const submitApprovalDecision = async (input: {
   id: string;

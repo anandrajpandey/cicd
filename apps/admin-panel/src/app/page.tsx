@@ -1,9 +1,15 @@
+import { GitHubConnectCard } from "../components/github-connect-card";
 import { IncidentTable } from "../components/incident-table";
+import { RepositoryList } from "../components/repository-list";
 import { AdminShell, MetricCard } from "../components/shell";
-import { getAnalyticsData, getIncidentListData } from "../lib/data";
+import { getAnalyticsData, getConnectedRepositories, getIncidentListData } from "../lib/data";
 
 const DashboardPage = async () => {
-  const [analytics, incidentList] = await Promise.all([getAnalyticsData(), getIncidentListData()]);
+  const [analytics, incidentList, repositories] = await Promise.all([
+    getAnalyticsData(),
+    getIncidentListData(),
+    getConnectedRepositories()
+  ]);
 
   return (
     <AdminShell
@@ -25,6 +31,12 @@ const DashboardPage = async () => {
         value={`${Math.round(analytics.slaCompliance * 100)}%`}
         detail="Approval and remediation windows met in the last cycle."
       />
+      <MetricCard
+        label="Connected Repositories"
+        value={String(repositories.length)}
+        detail="Repositories currently available from the connected GitHub account."
+      />
+      {repositories.length === 0 ? <GitHubConnectCard /> : <RepositoryList repositories={repositories.slice(0, 8)} />}
       <IncidentTable incidents={incidentList} />
     </AdminShell>
   );

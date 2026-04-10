@@ -1,4 +1,5 @@
 export { default as DashboardPage } from "./app/page";
+export { default as RepositoriesPage } from "./app/repositories/page";
 export { default as IncidentsPage } from "./app/incidents/page";
 export { default as IncidentDetailPage } from "./app/incidents/[id]/page";
 export { default as ApprovalsPage } from "./app/approvals/page";

@@ -18,6 +18,7 @@ import {
   challengesTable,
   decisionsTable,
   pipelineEventsTable,
+  repositoriesTable,
   rebuttalsTable
 } from "./schema.js";
 
@@ -87,6 +88,18 @@ export type AnalyticsSnapshot = {
     dependency: number;
   };
   slaCompliance: number;
+};
+
+export type ConnectedRepository = {
+  id: string;
+  provider: string;
+  owner: string;
+  name: string;
+  fullName: string;
+  defaultBranch: string;
+  isPrivate: boolean;
+  isActive: boolean;
+  lastSyncedAt: string;
 };
 
 export const persistPipelineEvent = async (client: DatabaseClient, event: PipelineEvent): Promise<void> => {
@@ -430,4 +443,105 @@ export const getAnalyticsSnapshot = async (client: DatabaseClient): Promise<Anal
     },
     slaCompliance: Number(approvalStats?.compliance ?? 1)
   };
+};
+
+export const listRepositories = async (client: DatabaseClient): Promise<ConnectedRepository[]> => {
+  const rows = await client.db
+    .select({
+      id: repositoriesTable.id,
+      provider: repositoriesTable.provider,
+      owner: repositoriesTable.owner,
+      name: repositoriesTable.name,
+      fullName: repositoriesTable.fullName,
+      defaultBranch: repositoriesTable.defaultBranch,
+      isPrivate: repositoriesTable.isPrivate,
+      isActive: repositoriesTable.isActive,
+      lastSyncedAt: repositoriesTable.lastSyncedAt
+    })
+    .from(repositoriesTable)
+    .orderBy(desc(repositoriesTable.lastSyncedAt), repositoriesTable.fullName);
+
+  return rows.map((row) => ({
+    ...row,
+    lastSyncedAt: row.lastSyncedAt.toISOString()
+  }));
+};
+
+export const getRepositoryByFullName = async (
+  client: DatabaseClient,
+  fullName: string
+): Promise<ConnectedRepository | null> => {
+  const [row] = await client.db
+    .select({
+      id: repositoriesTable.id,
+      provider: repositoriesTable.provider,
+      owner: repositoriesTable.owner,
+      name: repositoriesTable.name,
+      fullName: repositoriesTable.fullName,
+      defaultBranch: repositoriesTable.defaultBranch,
+      isPrivate: repositoriesTable.isPrivate,
+      isActive: repositoriesTable.isActive,
+      lastSyncedAt: repositoriesTable.lastSyncedAt
+    })
+    .from(repositoriesTable)
+    .where(eq(repositoriesTable.fullName, fullName))
+    .limit(1);
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    ...row,
+    lastSyncedAt: row.lastSyncedAt.toISOString()
+  };
+};
+
+export const upsertRepositories = async (
+  client: DatabaseClient,
+  repositories: Array<{
+    provider: string;
+    owner: string;
+    name: string;
+    fullName: string;
+    defaultBranch: string;
+    isPrivate: boolean;
+    isActive?: boolean;
+    metadata?: Record<string, unknown>;
+  }>
+): Promise<void> => {
+  if (repositories.length === 0) {
+    return;
+  }
+
+  await client.db
+    .insert(repositoriesTable)
+    .values(
+      repositories.map((repository) => ({
+        provider: repository.provider,
+        owner: repository.owner,
+        name: repository.name,
+        fullName: repository.fullName,
+        defaultBranch: repository.defaultBranch,
+        isPrivate: repository.isPrivate,
+        isActive: repository.isActive ?? true,
+        metadata: repository.metadata ?? {},
+        lastSyncedAt: new Date(),
+        updatedAt: new Date()
+      }))
+    )
+    .onConflictDoUpdate({
+      target: repositoriesTable.fullName,
+      set: {
+        provider: sql`excluded.provider`,
+        owner: sql`excluded.owner`,
+        name: sql`excluded.name`,
+        defaultBranch: sql`excluded.default_branch`,
+        isPrivate: sql`excluded.is_private`,
+        isActive: sql`excluded.is_active`,
+        metadata: sql`excluded.metadata`,
+        lastSyncedAt: sql`excluded.last_synced_at`,
+        updatedAt: sql`excluded.updated_at`
+      }
+    });
 };
