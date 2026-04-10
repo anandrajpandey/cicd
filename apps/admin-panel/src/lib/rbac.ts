@@ -1,4 +1,4 @@
-import type { Role } from "./mock-data.js";
+import type { Role } from "./mock-data";
 
 export const roleAccess = {
   dashboard: ["Admin", "Approver", "Viewer"],

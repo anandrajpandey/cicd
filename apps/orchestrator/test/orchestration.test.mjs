@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { buildServer } from "../dist/index.js";
 import {
   dispatchAgentFindings,
+  enrichPipelineEvent,
   orchestrateIncident,
   routeDecision,
   runDebate
@@ -157,12 +158,37 @@ const makeDependencies = () => {
           return "retry";
         }
       },
+      enrichment: {
+        fetchGitHubContext: async () => ({
+          gitDiff: "diff --git a/package.json b/package.json\n+\"version\": \"1.0.1\"",
+          changedFiles: ["package.json"],
+          touchedFiles: ["package.json"],
+          githubCommitUrl: "https://github.com/acme/api/commit/abc123"
+        }),
+        fetchJenkinsContext: async () => ({
+          jenkinsLogLines: ["Build failed for acme/api", "npm ERR! missing script: build"],
+          rawLogExcerpt: "npm ERR! missing script: build"
+        })
+      },
       publishEvent: async (message) => {
         calls.published.push(message);
       }
     }
   };
 };
+
+test("enrichPipelineEvent merges GitHub diff and Jenkins log context", async () => {
+  const { dependencies } = makeDependencies();
+  const enriched = await enrichPipelineEvent(baseEvent, dependencies.enrichment);
+
+  assert.match(enriched.context.gitDiff, /package\.json/);
+  assert.deepEqual(enriched.context.changedFiles, ["package.json"]);
+  assert.deepEqual(enriched.context.jenkinsLogLines, [
+    "Build failed for acme/api",
+    "npm ERR! missing script: build"
+  ]);
+  assert.equal(enriched.context.githubCommitUrl, "https://github.com/acme/api/commit/abc123");
+});
 
 test("dispatchAgentFindings fans out to all four specialist agents", async () => {
   const { dependencies } = makeDependencies();

@@ -1,8 +1,8 @@
-import { IncidentTable } from "../components/incident-table.js";
-import { AdminShell, MetricCard } from "../components/shell.js";
-import { analyticsSnapshot, incidents } from "../lib/mock-data.js";
+import { IncidentTable } from "../components/incident-table";
+import { AdminShell, MetricCard } from "../components/shell";
+import { analyticsSnapshot, incidents } from "../lib/mock-data";
 
-export const DashboardPage = () => (
+const DashboardPage = () => (
   <AdminShell
     title="Pipeline Command Center"
     subtitle="A dark-blue operations surface with green signal accents for live risk, debate progress, and human approval load."

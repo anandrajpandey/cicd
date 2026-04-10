@@ -1,6 +1,7 @@
 import type { CSSProperties, PropsWithChildren, ReactNode } from "react";
+import Link from "next/link";
 
-import { panelStyle, pageShellStyle, theme } from "../lib/theme.js";
+import { panelStyle, pageShellStyle, theme } from "../lib/theme";
 
 const navStyle: CSSProperties = {
   display: "flex",
@@ -29,11 +30,11 @@ export const AdminShell = ({
 }>) => (
   <main style={pageShellStyle}>
     <div style={navStyle}>
-      <span>Dashboard</span>
-      <span>Incidents</span>
-      <span>Approvals</span>
-      <span>Analytics</span>
-      <span>Settings</span>
+      <Link href="/">Dashboard</Link>
+      <Link href="/incidents">Incidents</Link>
+      <Link href="/approvals">Approvals</Link>
+      <Link href="/analytics">Analytics</Link>
+      <Link href="/settings">Settings</Link>
     </div>
     <section
       style={{

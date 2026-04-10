@@ -12,10 +12,11 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "dev": "tsc -p tsconfig.json --watch",
+    "build": "next build",
+    "dev": "next dev --port 3000",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm run build && node --test test/**/*.test.mjs",
+    "test": "pnpm exec tsx --test test/**/*.test.mjs",
+    "start": "next start --port 3000",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "powershell -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }\""
   },
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1"
+    "@types/react-dom": "^18.3.1",
+    "tsx": "^4.20.6"
   }
 }

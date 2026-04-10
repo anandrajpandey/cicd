@@ -64,6 +64,11 @@ type JudgeClient = {
   synthesize: (input: SynthesizeRequest) => Promise<Decision>;
 };
 
+type EnrichmentClient = {
+  fetchGitHubContext: (event: PipelineEvent) => Promise<Record<string, unknown>>;
+  fetchJenkinsContext: (event: PipelineEvent) => Promise<Record<string, unknown>>;
+};
+
 type NotificationClient = {
   sendSlack: (decision: Decision) => Promise<void>;
   sendPagerDuty: (decision: Decision) => Promise<void>;
@@ -82,6 +87,7 @@ export type OrchestratorDependencies = {
   judge: JudgeClient;
   notifications: NotificationClient;
   remediation: RemediationClient;
+  enrichment?: EnrichmentClient;
   publishEvent?: typeof publishMessage;
 };
 
@@ -126,18 +132,154 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, fallback: 
   }
 };
 
-export const enrichPipelineEvent = async (event: PipelineEvent): Promise<EnrichedPipelineEvent> => {
-  // TODO: replace placeholder enrichment with GitHub, Jenkins, CloudWatch, and X-Ray integrations.
+const parseRepository = (repository: string): { owner: string; repo: string } | null => {
+  const [owner, repo] = repository.split("/");
+  return owner && repo ? { owner, repo } : null;
+};
+
+const fetchGitHubContext = async (event: PipelineEvent): Promise<Record<string, unknown>> => {
+  const parsedRepository = parseRepository(event.repository);
+
+  if (!parsedRepository || !event.commitSha) {
+    return {};
+  }
+
+  const headers = new Headers({
+    accept: "application/vnd.github+json"
+  });
+  const token =
+    typeof event.metadata.githubToken === "string" && event.metadata.githubToken.length > 0
+      ? event.metadata.githubToken
+      : process.env.GITHUB_TOKEN;
+
+  if (token) {
+    headers.set("authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(
+    `https://api.github.com/repos/${parsedRepository.owner}/${parsedRepository.repo}/commits/${event.commitSha}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch GitHub commit context with status ${response.status}.`);
+  }
+
+  const commit = (await response.json()) as {
+    html_url?: string;
+    files?: Array<{
+      filename: string;
+      patch?: string;
+      status?: string;
+    }>;
+  };
+
+  const files = commit.files ?? [];
+  const changedFiles = files.map((file: { filename: string }) => file.filename);
+  const gitDiff = files
+    .map((file: { filename: string; patch?: string; status?: string }) => {
+      const patchBody = file.patch ?? `${file.status ?? "modified"} ${file.filename}`;
+      return `diff --git a/${file.filename} b/${file.filename}\n${patchBody}`;
+    })
+    .join("\n\n");
+
+  return {
+    gitDiff,
+    changedFiles,
+    touchedFiles: changedFiles,
+    githubCommitUrl: commit.html_url ?? null
+  };
+};
+
+const fetchJenkinsContext = async (event: PipelineEvent): Promise<Record<string, unknown>> => {
+  const looksLikeJenkins =
+    event.sourceTool === "jenkins" ||
+    event.rawLogsRef.toLowerCase().includes("jenkins") ||
+    event.rawLogsRef.toLowerCase().includes("/console");
+
+  if (!looksLikeJenkins) {
+    return {};
+  }
+
+  const headers = new Headers();
+  const user = process.env.JENKINS_USER;
+  const token = process.env.JENKINS_TOKEN;
+
+  if (user && token) {
+    headers.set("authorization", `Basic ${Buffer.from(`${user}:${token}`).toString("base64")}`);
+  }
+
+  const response = await fetch(event.rawLogsRef, { headers });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Jenkins logs with status ${response.status}.`);
+  }
+
+  const lines = (await response.text())
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0)
+    .slice(-500);
+
+  return {
+    jenkinsLogLines: lines,
+    rawLogExcerpt: lines.slice(-25).join("\n")
+  };
+};
+
+const defaultEnrichmentClient: EnrichmentClient = {
+  fetchGitHubContext,
+  fetchJenkinsContext
+};
+
+export const enrichPipelineEvent = async (
+  event: PipelineEvent,
+  enrichment: EnrichmentClient = defaultEnrichmentClient
+): Promise<EnrichedPipelineEvent> => {
+  const [gitHubResult, jenkinsResult] = await Promise.allSettled([
+    enrichment.fetchGitHubContext(event),
+    enrichment.fetchJenkinsContext(event)
+  ]);
+
+  const errors: string[] = [];
+  const gitHubContext = gitHubResult.status === "fulfilled" ? gitHubResult.value : {};
+  const jenkinsContext = jenkinsResult.status === "fulfilled" ? jenkinsResult.value : {};
+
+  if (gitHubResult.status === "rejected") {
+    errors.push(`github:${gitHubResult.reason instanceof Error ? gitHubResult.reason.message : "unknown error"}`);
+  }
+
+  if (jenkinsResult.status === "rejected") {
+    errors.push(`jenkins:${jenkinsResult.reason instanceof Error ? jenkinsResult.reason.message : "unknown error"}`);
+  }
+
   return enrichedPipelineEventSchema.parse({
     ...event,
     context: {
-      gitDiff: `diff --git a/${event.repository} b/${event.repository}`,
-      jenkinsLogLines: [`Build failed for ${event.repository}`],
-      changedFiles: ["package.json", "src/index.ts"],
-      touchedFiles: ["package.json", "src/index.ts"],
+      gitDiff:
+        typeof gitHubContext.gitDiff === "string" && gitHubContext.gitDiff.length > 0
+          ? gitHubContext.gitDiff
+          : `diff --git a/${event.repository} b/${event.repository}`,
+      jenkinsLogLines:
+        Array.isArray(jenkinsContext.jenkinsLogLines) && jenkinsContext.jenkinsLogLines.length > 0
+          ? jenkinsContext.jenkinsLogLines
+          : [`Build failed for ${event.repository}`],
+      changedFiles:
+        Array.isArray(gitHubContext.changedFiles) && gitHubContext.changedFiles.length > 0
+          ? gitHubContext.changedFiles
+          : ["package.json", "src/index.ts"],
+      touchedFiles:
+        Array.isArray(gitHubContext.touchedFiles) && gitHubContext.touchedFiles.length > 0
+          ? gitHubContext.touchedFiles
+          : ["package.json", "src/index.ts"],
       failingTests: [],
       dependencies: [],
-      rawLogExcerpt: `Failure type: ${event.failureType}`
+      rawLogExcerpt:
+        typeof jenkinsContext.rawLogExcerpt === "string" && jenkinsContext.rawLogExcerpt.length > 0
+          ? jenkinsContext.rawLogExcerpt
+          : `Failure type: ${event.failureType}`,
+      githubCommitUrl: gitHubContext.githubCommitUrl ?? null,
+      enrichmentErrors: errors
     }
   });
 };
@@ -269,7 +411,7 @@ export const orchestrateIncident = async (
   event: PipelineEvent,
   dependencies: OrchestratorDependencies
 ): Promise<OrchestrationResult> => {
-  const enrichedEvent = await enrichPipelineEvent(event);
+  const enrichedEvent = await enrichPipelineEvent(event, dependencies.enrichment);
   const findings = await dispatchAgentFindings(enrichedEvent, dependencies.agents);
 
   await (dependencies.publishEvent ?? publishMessage)({

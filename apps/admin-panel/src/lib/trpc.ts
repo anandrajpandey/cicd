@@ -1,7 +1,7 @@
 import { initTRPC } from "@trpc/server";
 import { z } from "zod";
 
-import { analyticsSnapshot, approvals, incidents } from "./mock-data.js";
+import { analyticsSnapshot, approvals, incidents } from "./mock-data";
 
 const t = initTRPC.create();
 

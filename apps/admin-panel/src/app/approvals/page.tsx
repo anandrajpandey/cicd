@@ -1,7 +1,7 @@
-import { AdminShell, MetricCard } from "../../components/shell.js";
-import { approvals } from "../../lib/mock-data.js";
+import { AdminShell, MetricCard } from "../../components/shell";
+import { approvals } from "../../lib/mock-data";
 
-export const ApprovalsPage = () => (
+const ApprovalsPage = () => (
   <AdminShell
     title="Approval Queue"
     subtitle="Pending MEDIUM and HIGH decisions are grouped with SLA countdowns so approvers can clear risk in order."

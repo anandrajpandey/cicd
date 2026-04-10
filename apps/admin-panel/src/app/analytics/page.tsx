@@ -1,7 +1,7 @@
-import { AdminShell, MetricCard } from "../../components/shell.js";
-import { analyticsSnapshot } from "../../lib/mock-data.js";
+import { AdminShell, MetricCard } from "../../components/shell";
+import { analyticsSnapshot } from "../../lib/mock-data";
 
-export const AnalyticsPage = () => (
+const AnalyticsPage = () => (
   <AdminShell
     title="Analytics"
     subtitle="Agent confidence, SLA performance, and risk distribution are framed with high-contrast dark-blue panels and green signal copy."

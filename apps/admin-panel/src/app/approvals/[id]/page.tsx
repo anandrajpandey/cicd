@@ -1,7 +1,7 @@
-import { AdminShell, MetricCard } from "../../../components/shell.js";
-import { approvals } from "../../../lib/mock-data.js";
+import { AdminShell, MetricCard } from "../../../components/shell";
+import { approvals } from "../../../lib/mock-data";
 
-export const ApprovalDetailPage = () => {
+const ApprovalDetailPage = () => {
   const approval = approvals[0];
 
   return (

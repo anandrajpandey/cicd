@@ -1,6 +1,6 @@
-import { AdminShell, MetricCard } from "../../components/shell.js";
+import { AdminShell, MetricCard } from "../../components/shell";
 
-export const SettingsPage = () => (
+const SettingsPage = () => (
   <AdminShell
     title="Settings"
     subtitle="Tune risk thresholds, agent weights, and notification routing without leaving the control panel."

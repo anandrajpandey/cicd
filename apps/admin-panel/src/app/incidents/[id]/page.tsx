@@ -1,7 +1,7 @@
-import { AdminShell, MetricCard } from "../../../components/shell.js";
-import { incidents } from "../../../lib/mock-data.js";
+import { AdminShell, MetricCard } from "../../../components/shell";
+import { incidents } from "../../../lib/mock-data";
 
-export const IncidentDetailPage = () => {
+const IncidentDetailPage = () => {
   const incident = incidents[0];
 
   return (

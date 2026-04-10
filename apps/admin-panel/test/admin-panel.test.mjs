@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { canAccess } from "../dist/lib/rbac.js";
-import { appRouter } from "../dist/lib/trpc.js";
-import { DashboardPage } from "../dist/app/page.js";
-import { IncidentsPage } from "../dist/app/incidents/page.js";
-import { createRealtimeClient } from "../dist/realtime.js";
+import { canAccess } from "../src/lib/rbac.ts";
+import { appRouter } from "../src/lib/trpc.ts";
+import DashboardPage from "../src/app/page.tsx";
+import IncidentsPage from "../src/app/incidents/page.tsx";
+import { createRealtimeClient } from "../src/realtime.ts";
 
 test("RBAC grants access by role and area", async () => {
   assert.equal(canAccess("Admin", "settings"), true);

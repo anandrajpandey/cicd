@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 
-import type { IncidentSummary } from "../lib/mock-data.js";
-import { badgeStyle, panelStyle, theme } from "../lib/theme.js";
+import type { IncidentSummary } from "../lib/mock-data";
+import { badgeStyle, panelStyle, theme } from "../lib/theme";
 
 const tableStyle: CSSProperties = {
   width: "100%",
