@@ -1,7 +1,14 @@
 import { initTRPC } from "@trpc/server";
 import { z } from "zod";
 
-import { analyticsSnapshot, approvals, incidents } from "./mock-data";
+import {
+  getAnalyticsData,
+  getApprovalDetailData,
+  getApprovalListData,
+  getIncidentDetailData,
+  getIncidentListData,
+  submitApprovalDecision
+} from "./data";
 
 const t = initTRPC.create();
 
@@ -16,8 +23,8 @@ export const appRouter = t.router({
           })
           .optional()
       )
-      .query(({ input }) =>
-        incidents.filter((incident) => {
+      .query(async ({ input }) =>
+        (await getIncidentListData()).filter((incident) => {
           const matchesRepository = input?.repository
             ? incident.repository.toLowerCase().includes(input.repository.toLowerCase())
             : true;
@@ -25,11 +32,11 @@ export const appRouter = t.router({
           return matchesRepository && matchesRisk;
         })
       ),
-    getById: t.procedure.input(z.string()).query(({ input }) => incidents.find((incident) => incident.id === input))
+    getById: t.procedure.input(z.string()).query(({ input }) => getIncidentDetailData(input))
   }),
   approvals: t.router({
-    list: t.procedure.query(() => approvals),
-    getById: t.procedure.input(z.string()).query(({ input }) => approvals.find((approval) => approval.id === input)),
+    list: t.procedure.query(() => getApprovalListData()),
+    getById: t.procedure.input(z.string()).query(({ input }) => getApprovalDetailData(input)),
     submit: t.procedure
       .input(
         z.object({
@@ -38,16 +45,12 @@ export const appRouter = t.router({
           justification: z.string().min(1)
         })
       )
-      .mutation(({ input }) => ({
-        approvalId: input.id,
-        status: input.action,
-        justification: input.justification
-      }))
+      .mutation(({ input }) => submitApprovalDecision(input))
   }),
   analytics: t.router({
-    agentAccuracy: t.procedure.query(() => analyticsSnapshot.agentAccuracy),
-    slaCompliance: t.procedure.query(() => analyticsSnapshot.slaCompliance),
-    riskDistribution: t.procedure.query(() => analyticsSnapshot.riskDistribution)
+    agentAccuracy: t.procedure.query(async () => (await getAnalyticsData()).agentAccuracy),
+    slaCompliance: t.procedure.query(async () => (await getAnalyticsData()).slaCompliance),
+    riskDistribution: t.procedure.query(async () => (await getAnalyticsData()).riskDistribution)
   }),
   settings: t.router({
     getRiskThresholds: t.procedure.query(() => ({

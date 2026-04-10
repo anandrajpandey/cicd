@@ -21,6 +21,7 @@
     "clean": "powershell -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }\""
   },
   "dependencies": {
+    "@packages/db": "workspace:*",
     "@packages/shared-types": "workspace:*",
     "@trpc/server": "^11.0.0",
     "next": "^15.0.0",

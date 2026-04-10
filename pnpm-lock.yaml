@@ -20,6 +20,9 @@ importers:
 
   apps/admin-panel:
     dependencies:
+      '@packages/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@packages/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
@@ -147,6 +150,9 @@ importers:
 
   apps/orchestrator:
     dependencies:
+      '@packages/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@packages/kafka-client':
         specifier: workspace:*
         version: link:../../packages/kafka-client
@@ -165,6 +171,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@packages/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
       drizzle-orm:
         specifier: ^0.44.5
         version: 0.44.7(@opentelemetry/api@1.9.0)(postgres@3.4.9)

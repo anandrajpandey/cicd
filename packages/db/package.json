@@ -23,6 +23,7 @@
     "clean": "powershell -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }\""
   },
   "dependencies": {
+    "@packages/shared-types": "workspace:*",
     "drizzle-orm": "^0.44.5",
     "postgres": "^3.4.7"
   },

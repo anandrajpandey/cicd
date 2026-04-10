@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import type { DatabaseClient } from "@packages/db";
 import { TOPICS, publishMessage } from "@packages/kafka-client";
 import {
   agentFindingSchema,
@@ -82,12 +83,24 @@ type RemediationClient = {
   retryPipeline: (event: PipelineEvent) => Promise<string>;
 };
 
+type PersistenceClient = {
+  persist: (input: {
+    event: PipelineEvent;
+    findings: AgentFinding[];
+    challenges: Challenge[];
+    rebuttals: Rebuttal[];
+    decision: Decision;
+    routing: OrchestrationResult["routing"];
+  }) => Promise<void>;
+};
+
 export type OrchestratorDependencies = {
   agents: Record<SpecialistAgentId, AgentClient>;
   judge: JudgeClient;
   notifications: NotificationClient;
   remediation: RemediationClient;
   enrichment?: EnrichmentClient;
+  persistence?: PersistenceClient;
   publishEvent?: typeof publishMessage;
 };
 
@@ -407,6 +420,79 @@ const executeRemediation = async (
   return remediation.retryPipeline(event);
 };
 
+export const createDatabasePersistence = (
+  database: DatabaseClient,
+  helpers: {
+    persistPipelineEvent: typeof import("@packages/db").persistPipelineEvent;
+    persistAgentFindings: typeof import("@packages/db").persistAgentFindings;
+    persistChallenges: typeof import("@packages/db").persistChallenges;
+    persistRebuttals: typeof import("@packages/db").persistRebuttals;
+    persistDecision: typeof import("@packages/db").persistDecision;
+    persistAuditEntries: typeof import("@packages/db").persistAuditEntries;
+  }
+): PersistenceClient => ({
+  persist: async ({ event, findings, challenges, rebuttals, decision, routing }) => {
+    await helpers.persistPipelineEvent(database, event);
+    await helpers.persistAgentFindings(database, findings);
+    await helpers.persistChallenges(database, event.eventId, challenges);
+    await helpers.persistRebuttals(database, rebuttals);
+    await helpers.persistDecision(database, decision);
+    await helpers.persistAuditEntries(database, [
+      {
+        entryId: randomUUID(),
+        eventId: event.eventId,
+        stepType: "event.received",
+        actor: "orchestrator",
+        payload: {
+          sourceTool: event.sourceTool,
+          repository: event.repository
+        },
+        timestamp: new Date()
+      },
+      ...findings.map((finding) => ({
+        entryId: randomUUID(),
+        eventId: event.eventId,
+        stepType: "finding.submitted",
+        actor: finding.agentId,
+        payload: finding,
+        timestamp: new Date()
+      })),
+      ...challenges.map((challenge) => ({
+        entryId: randomUUID(),
+        eventId: event.eventId,
+        stepType: "challenge.issued",
+        actor: challenge.challengerAgentId,
+        payload: challenge,
+        timestamp: new Date()
+      })),
+      ...rebuttals.map((rebuttal) => ({
+        entryId: randomUUID(),
+        eventId: event.eventId,
+        stepType: "rebuttal.submitted",
+        actor: rebuttal.respondingAgentId,
+        payload: rebuttal,
+        timestamp: new Date()
+      })),
+      {
+        entryId: randomUUID(),
+        eventId: event.eventId,
+        stepType: "decision.produced",
+        actor: "judge",
+        payload: decision,
+        timestamp: new Date()
+      },
+      {
+        entryId: randomUUID(),
+        eventId: event.eventId,
+        stepType: routing.mode === "AUTO_REMEDIATE" ? "remediation.executed" : "routing.completed",
+        actor: "orchestrator",
+        payload: routing,
+        timestamp: new Date()
+      }
+    ]);
+  }
+});
+
 export const orchestrateIncident = async (
   event: PipelineEvent,
   dependencies: OrchestratorDependencies
@@ -439,6 +525,17 @@ export const orchestrateIncident = async (
   });
 
   const routing = await routeDecision(event, decision, findings, dependencies);
+
+  if (dependencies.persistence) {
+    await dependencies.persistence.persist({
+      event,
+      findings,
+      challenges,
+      rebuttals,
+      decision,
+      routing
+    });
+  }
 
   return {
     enrichedEvent,

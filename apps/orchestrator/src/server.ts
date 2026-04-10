@@ -1,6 +1,15 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import rawBody from "fastify-raw-body";
 
+import {
+  createDatabaseClient,
+  persistAgentFindings,
+  persistAuditEntries,
+  persistChallenges,
+  persistDecision,
+  persistPipelineEvent,
+  persistRebuttals
+} from "@packages/db";
 import { TOPICS, publishMessage } from "@packages/kafka-client";
 import type { PipelineEvent } from "@packages/shared-types";
 import { ZodError } from "zod";
@@ -12,7 +21,7 @@ import {
   normalizeXRayEvent,
   verifyHmacSignature
 } from "./normalizers.js";
-import { orchestrateIncident } from "./orchestration.js";
+import { createDatabasePersistence, orchestrateIncident } from "./orchestration.js";
 
 type EventPublisher = (event: PipelineEvent) => Promise<void>;
 
@@ -43,6 +52,18 @@ const createRuntimeOrchestratorDependencies = (): Parameters<typeof orchestrateI
   const testAnalyzerUrl = process.env.TEST_ANALYZER_URL ?? "http://127.0.0.1:4103";
   const dependencyCheckerUrl = process.env.DEPENDENCY_CHECKER_URL ?? "http://127.0.0.1:4104";
   const judgeUrl = process.env.JUDGE_URL ?? "http://127.0.0.1:4105";
+
+  const persistence =
+    process.env.DATABASE_URL && process.env.DATABASE_URL.length > 0
+      ? createDatabasePersistence(createDatabaseClient(process.env.DATABASE_URL), {
+          persistPipelineEvent,
+          persistAgentFindings,
+          persistChallenges,
+          persistRebuttals,
+          persistDecision,
+          persistAuditEntries
+        })
+      : undefined;
 
   return {
     agents: {
@@ -75,6 +96,7 @@ const createRuntimeOrchestratorDependencies = (): Parameters<typeof orchestrateI
       sendPagerDuty: async () => {},
       createGitHubIssue: async () => {}
     },
+    persistence,
     publishEvent: async () => {},
     remediation: {
       createSkipPullRequest: async () => "skip-pr-not-implemented",

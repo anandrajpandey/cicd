@@ -20,6 +20,7 @@
     "clean": "powershell -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }\""
   },
   "dependencies": {
+    "@packages/db": "workspace:*",
     "@packages/kafka-client": "workspace:*",
     "@packages/shared-types": "workspace:*",
     "fastify": "^4.29.0",
