@@ -51,6 +51,49 @@ test("POST /webhook/github normalizes and publishes a valid workflow event", asy
   await app.close();
 });
 
+test("POST /webhook/github accepts workflow runs with null conclusion", async () => {
+  process.env.GITHUB_WEBHOOK_SECRET = githubSecret;
+  const published = [];
+  const app = await buildServer({
+    publishEvent: async (event) => {
+      published.push(event);
+    }
+  });
+
+  const payload = {
+    action: "requested",
+    repository: {
+      full_name: "acme/api"
+    },
+    workflow_run: {
+      id: 99,
+      head_sha: "def456",
+      head_branch: "main",
+      html_url: "https://github.com/acme/api/actions/runs/99",
+      status: "in_progress",
+      conclusion: null
+    }
+  };
+  const body = JSON.stringify(payload);
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/webhook/github",
+    payload: body,
+    headers: {
+      "content-type": "application/json",
+      "x-hub-signature-256": sign(body, githubSecret)
+    }
+  });
+
+  assert.equal(response.statusCode, 202);
+  assert.equal(published.length, 1);
+  assert.equal(published[0].failureType, "in_progress");
+  assert.equal(published[0].metadata.workflowRunConclusion, null);
+
+  await app.close();
+});
+
 test("POST /webhook/github rejects invalid signatures", async () => {
   process.env.GITHUB_WEBHOOK_SECRET = githubSecret;
   const app = await buildServer({

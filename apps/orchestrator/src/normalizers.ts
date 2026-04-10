@@ -10,7 +10,8 @@ const githubPayloadSchema = z.object({
     head_sha: z.string().min(1),
     head_branch: z.string().min(1),
     html_url: z.string().url(),
-    conclusion: z.string().optional(),
+    status: z.string().optional(),
+    conclusion: z.string().nullable().optional(),
     repository: z.object({
       full_name: z.string().min(1)
     }).optional()
@@ -82,6 +83,8 @@ export const verifyHmacSignature = (rawBody: string, signature: string | undefin
 export const normalizeGitHubEvent = (payload: unknown): PipelineEvent => {
   const parsed = githubPayloadSchema.parse(payload);
   const workflowRun = parsed.workflow_run;
+  const failureType =
+    workflowRun?.conclusion ?? workflowRun?.status ?? "workflow_run_pending";
 
   return pipelineEventSchema.parse({
     eventId: randomUUID(),
@@ -89,11 +92,13 @@ export const normalizeGitHubEvent = (payload: unknown): PipelineEvent => {
     repository: parsed.repository.full_name,
     commitSha: workflowRun?.head_sha ?? "unknown",
     branch: workflowRun?.head_branch ?? "unknown",
-    failureType: workflowRun?.conclusion ?? "workflow_failure",
+    failureType,
     rawLogsRef: workflowRun?.html_url ?? "https://github.com",
     metadata: {
       action: parsed.action ?? "workflow_run",
-      workflowRunId: workflowRun?.id ?? null
+      workflowRunId: workflowRun?.id ?? null,
+      workflowRunStatus: workflowRun?.status ?? null,
+      workflowRunConclusion: workflowRun?.conclusion ?? null
     },
     timestamp: new Date()
   });
