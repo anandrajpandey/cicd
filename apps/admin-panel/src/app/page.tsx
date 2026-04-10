@@ -1,15 +1,27 @@
 import { GitHubConnectCard } from "../components/github-connect-card";
+import { getGitHubConnectStatus } from "../lib/github-connect-status";
 import { IncidentTable } from "../components/incident-table";
 import { RepositoryList } from "../components/repository-list";
 import { AdminShell, MetricCard } from "../components/shell";
 import { getAnalyticsData, getConnectedRepositories, getIncidentListData } from "../lib/data";
 
-const DashboardPage = async () => {
+const DashboardPage = async ({
+  searchParams
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) => {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const [analytics, incidentList, repositories] = await Promise.all([
     getAnalyticsData(),
     getIncidentListData(),
     getConnectedRepositories()
   ]);
+  const status = getGitHubConnectStatus({
+    connected: typeof resolvedSearchParams?.connected === "string" ? resolvedSearchParams.connected : undefined,
+    synced: typeof resolvedSearchParams?.synced === "string" ? resolvedSearchParams.synced : undefined,
+    account: typeof resolvedSearchParams?.account === "string" ? resolvedSearchParams.account : undefined,
+    error: typeof resolvedSearchParams?.error === "string" ? resolvedSearchParams.error : undefined
+  });
 
   return (
     <AdminShell
@@ -36,7 +48,11 @@ const DashboardPage = async () => {
         value={String(repositories.length)}
         detail="Repositories currently available from the connected GitHub account."
       />
-      {repositories.length === 0 ? <GitHubConnectCard /> : <RepositoryList repositories={repositories.slice(0, 8)} />}
+      {repositories.length === 0 ? (
+        <GitHubConnectCard status={status} />
+      ) : (
+        <RepositoryList repositories={repositories.slice(0, 8)} />
+      )}
       <IncidentTable incidents={incidentList} />
     </AdminShell>
   );

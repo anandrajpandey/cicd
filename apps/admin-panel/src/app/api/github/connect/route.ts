@@ -2,6 +2,7 @@ import { createDatabaseClient, upsertRepositories } from "@packages/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { createGitHubInstallUrl, hasGitHubAppInstallFlow } from "../../../../lib/github-app";
 import { readWorkspaceEnvVar } from "../../../../lib/env";
 
 const requestSchema = z.object({
@@ -74,4 +75,14 @@ export const POST = async (request: Request) => {
     accountLogin: profile.login ?? "GitHub",
     syncedCount: repos.length
   });
+};
+
+export const GET = async () => {
+  const appUrl = process.env.NEXTAUTH_URL ?? readWorkspaceEnvVar("NEXTAUTH_URL") ?? "http://127.0.0.1:3000";
+
+  if (!hasGitHubAppInstallFlow()) {
+    return NextResponse.redirect(new URL("/repositories?error=github_app_not_configured", appUrl));
+  }
+
+  return NextResponse.redirect(createGitHubInstallUrl());
 };
