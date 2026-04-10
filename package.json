@@ -1,0 +1,23 @@
+{
+  "name": "agentic-cicd-orchestration-system",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Monorepo for the Agentic CI/CD Pipeline Orchestration System",
+  "packageManager": "pnpm@10.7.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,208 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: agentic-postgres
+    environment:
+      POSTGRES_DB: agentic_cicd
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - agentic-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: agentic-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - agentic-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.9
+    container_name: agentic-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - agentic-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.9
+    container_name: agentic-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    networks:
+      - agentic-network
+
+  opensearch:
+    image: opensearchproject/opensearch:2
+    container_name: agentic-opensearch
+    environment:
+      discovery.type: single-node
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: change-this-admin-password
+      plugins.security.disabled: "true"
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - agentic-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: agentic-grafana
+    depends_on:
+      - opensearch
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - agentic-network
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: apps/orchestrator/Dockerfile
+    container_name: agentic-orchestrator
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    env_file:
+      - .env
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/agentic_cicd
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:29092
+      OPENSEARCH_URL: http://opensearch:9200
+    ports:
+      - "4000:4000"
+    networks:
+      - agentic-network
+
+  admin-panel:
+    build:
+      context: .
+      dockerfile: apps/admin-panel/Dockerfile
+    container_name: agentic-admin-panel
+    depends_on:
+      - orchestrator
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+      NEXTAUTH_URL: http://localhost:3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/agentic_cicd
+    ports:
+      - "3000:3000"
+    networks:
+      - agentic-network
+
+  build-analyzer:
+    build:
+      context: .
+      dockerfile: apps/agents/build-analyzer/Dockerfile
+    container_name: agentic-build-analyzer
+    env_file:
+      - .env
+    environment:
+      PORT: 4101
+    ports:
+      - "4101:4101"
+    networks:
+      - agentic-network
+
+  code-reviewer:
+    build:
+      context: .
+      dockerfile: apps/agents/code-reviewer/Dockerfile
+    container_name: agentic-code-reviewer
+    env_file:
+      - .env
+    environment:
+      PORT: 4102
+    ports:
+      - "4102:4102"
+    networks:
+      - agentic-network
+
+  test-analyzer:
+    build:
+      context: .
+      dockerfile: apps/agents/test-analyzer/Dockerfile
+    container_name: agentic-test-analyzer
+    env_file:
+      - .env
+    environment:
+      PORT: 4103
+    ports:
+      - "4103:4103"
+    networks:
+      - agentic-network
+
+  dependency-checker:
+    build:
+      context: .
+      dockerfile: apps/agents/dependency-checker/Dockerfile
+    container_name: agentic-dependency-checker
+    env_file:
+      - .env
+    environment:
+      PORT: 4104
+    ports:
+      - "4104:4104"
+    networks:
+      - agentic-network
+
+  judge:
+    build:
+      context: .
+      dockerfile: apps/agents/judge/Dockerfile
+    container_name: agentic-judge
+    env_file:
+      - .env
+    environment:
+      PORT: 4105
+    ports:
+      - "4105:4105"
+    networks:
+      - agentic-network
+
+networks:
+  agentic-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  kafka-data:
+  opensearch-data:
+  grafana-data:
