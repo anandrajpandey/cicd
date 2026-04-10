@@ -21,6 +21,70 @@ type BuildServerOptions = {
   orchestratorDependencies?: Parameters<typeof orchestrateIncident>[1];
 };
 
+const postJson = async <TResponse>(url: string, payload: unknown): Promise<TResponse> => {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request to ${url} failed with status ${response.status}.`);
+  }
+
+  return (await response.json()) as TResponse;
+};
+
+const createRuntimeOrchestratorDependencies = (): Parameters<typeof orchestrateIncident>[1] => {
+  const buildAnalyzerUrl = process.env.BUILD_ANALYZER_URL ?? "http://127.0.0.1:4101";
+  const codeReviewerUrl = process.env.CODE_REVIEWER_URL ?? "http://127.0.0.1:4102";
+  const testAnalyzerUrl = process.env.TEST_ANALYZER_URL ?? "http://127.0.0.1:4103";
+  const dependencyCheckerUrl = process.env.DEPENDENCY_CHECKER_URL ?? "http://127.0.0.1:4104";
+  const judgeUrl = process.env.JUDGE_URL ?? "http://127.0.0.1:4105";
+
+  return {
+    agents: {
+      build_analyzer: {
+        analyze: async (event) => postJson(`${buildAnalyzerUrl}/analyze`, event),
+        challenge: async (input) => postJson(`${buildAnalyzerUrl}/challenge`, input),
+        rebuttal: async (input) => postJson(`${buildAnalyzerUrl}/rebuttal`, input)
+      },
+      code_reviewer: {
+        analyze: async (event) => postJson(`${codeReviewerUrl}/analyze`, event),
+        challenge: async (input) => postJson(`${codeReviewerUrl}/challenge`, input),
+        rebuttal: async (input) => postJson(`${codeReviewerUrl}/rebuttal`, input)
+      },
+      test_analyzer: {
+        analyze: async (event) => postJson(`${testAnalyzerUrl}/analyze`, event),
+        challenge: async (input) => postJson(`${testAnalyzerUrl}/challenge`, input),
+        rebuttal: async (input) => postJson(`${testAnalyzerUrl}/rebuttal`, input)
+      },
+      dependency_checker: {
+        analyze: async (event) => postJson(`${dependencyCheckerUrl}/analyze`, event),
+        challenge: async (input) => postJson(`${dependencyCheckerUrl}/challenge`, input),
+        rebuttal: async (input) => postJson(`${dependencyCheckerUrl}/rebuttal`, input)
+      }
+    },
+    judge: {
+      synthesize: async (input) => postJson(`${judgeUrl}/synthesize`, input)
+    },
+    notifications: {
+      sendSlack: async () => {},
+      sendPagerDuty: async () => {},
+      createGitHubIssue: async () => {}
+    },
+    publishEvent: async () => {},
+    remediation: {
+      createSkipPullRequest: async () => "skip-pr-not-implemented",
+      createDependencyPinPullRequest: async () => "dependency-pr-not-implemented",
+      createLintFixPullRequest: async () => "lint-pr-not-implemented",
+      retryPipeline: async () => "retry-not-implemented"
+    }
+  };
+};
+
 const defaultPublishEvent: EventPublisher = async (event) => {
   await publishMessage({
     topic: TOPICS.pipelineEvents,
@@ -71,7 +135,7 @@ export const buildServer = async (options: BuildServerOptions = {}): Promise<Fas
   });
 
   const publishEvent = options.publishEvent ?? defaultPublishEvent;
-  const orchestratorDependencies = options.orchestratorDependencies;
+  const orchestratorDependencies = options.orchestratorDependencies ?? createRuntimeOrchestratorDependencies();
 
   app.post("/webhook/jenkins", async (request, reply) => {
     const secret = process.env.JENKINS_WEBHOOK_SECRET ?? process.env.JENKINS_TOKEN;
@@ -144,13 +208,6 @@ export const buildServer = async (options: BuildServerOptions = {}): Promise<Fas
   });
 
   app.post("/internal/orchestrate", async (request, reply) => {
-    if (!orchestratorDependencies) {
-      reply.code(501).send({
-        message: "Orchestration dependencies are not configured"
-      });
-      return;
-    }
-
     try {
       const event = request.body as PipelineEvent;
       const result = await orchestrateIncident(event, orchestratorDependencies);
